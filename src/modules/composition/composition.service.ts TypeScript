@@ -1,0 +1,32 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('composition-service');
+
+@Injectable()
+export class CompositionService {
+  private readonly logger = new Logger(CompositionService.name);
+
+  async compose(payload: any): Promise<any> {
+    return tracer.startActiveSpan('compose-payload', async (span) => {
+      try {
+        span.setAttribute('payload.size', JSON.stringify(payload).length);
+        span.setAttribute('tenant.id', payload.tenantId || 'unknown');
+
+        // ... lógica de composição ...
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        return { success: true, fusedAt: new Date() };
+      } catch (error) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error.message,
+        });
+        span.recordException(error);
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
+  }
+}
